@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Smart Notes</title>
+<style>
+  :root{
+    --bg:#f3f7fb; --card:#fff; --text:#0f172a; --accent:#2563eb;
+  }
+  body.dark{ --bg:#071127; --card:#0f1724; --text:#e6eef8; --accent:#38bdf8; } 
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:Inter,Segoe UI,system-ui,-apple-system,Roboto,"Helvetica Neue",Arial;
+    background:linear-gradient(135deg,#e6f0ff,#f3f7fb); color:var(--text);
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    transition:background .25s,color .25s;
+  }
+  body.dark{ background:linear-gradient(135deg,#071127,#0b2540); }
+  .app{
+    width:94%; max-width:900px; border-radius:14px; padding:18px;
+    background:var(--card); box-shadow:0 10px 30px rgba(2,6,23,0.12);
+  }
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  h1{margin:0;font-size:20px}
+  .center-area{display:grid;grid-template-columns:1fr 380px;gap:18px;margin-top:14px}
+  @media(max-width:880px){ .center-area{grid-template-columns:1fr} }
+
+  .login-box{max-width:420px;margin:0 auto;padding:12px}
+  input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #d1dbe8;background:transparent;color:var(--text);margin:8px 0;font-size:14px}
+  textarea{min-height:140px;resize:vertical}
+  .btn{display:inline-block;padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:white;cursor:pointer;font-weight:600}
+  .btn.secondary{background:#64748b}
+  .btn.warn{background:#ef4444}
+  .btn.small{padding:6px 10px;font-size:13px}
+
+  .notes-list{padding:12px;border-radius:10px;background:linear-gradient(180deg,#fbfdff,#eef6ff);max-height:520px;overflow:auto}
+  body.dark .notes-list{background:linear-gradient(180deg,#071127,#081a2a)}
+  .note-row{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;margin-bottom:8px;background:#fff;border:1px solid #eef6ff}
+  body.dark .note-row{background:#071427;border-color:#0c2740}
+  .note-title{font-weight:600}
+  .note-meta{font-size:12px;color:#6b7280}
+
+  .editor{padding:12px;border-radius:12px;background:linear-gradient(180deg,#ffffff,#f6fbff)}
+  body.dark .editor{background:linear-gradient(180deg,#071127,#061627)}
+
+  .calc {margin-top:12px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#f3f7fb)}
+  .calc-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+  .calc-display{width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1;font-size:18px;text-align:right}
+  
+  .calc.floating { position:fixed; right:20px; bottom:20px; width:260px; z-index:9999; box-shadow:0 10px 30px rgba(2,6,23,0.25) }
+
+  footer{text-align:center;color:#64748b;font-size:13px;margin-top:14px}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>📝 Smart Notes</h1>
+      <div>
+        <button id="themeBtn" class="btn small" onclick="toggleTheme()">🌙 Theme</button>
+        <button id="calcBtn" class="btn small" onclick="toggleCalculator()">🧮 Calculator</button>
+        <button id="logoutTopBtn" class="btn warn small" style="display:none" onclick="doLogout()">Logout</button>
+      </div>
+    </header>
+
+    <div id="loginWrap" class="login-box">
+      <h2>Login / Register</h2>
+      <input id="inUser" placeholder="Username" autocomplete="username" />
+      <input id="inPass" type="password" placeholder="Password" autocomplete="current-password" />
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="doLogin()">Login</button>
+        <button class="btn secondary" onclick="doSignup()">Signup</button>
+      </div>
+
+      <!-- ✅ Added Forget Password -->
+      <p style="margin-top:6px;">
+        <a href="#" onclick="forgotPass()" style="color:var(--accent);text-decoration:none;">Forgot Password?</a>
+      </p>
+
+      <p id="loginMsg" style="font-size:13px;color:#9aa8bf"></p>
+    </div>
+
+    <div id="mainUI" style="display:none">
+      <div class="center-area">
+        <div>
+          <div style="display:flex;justify-content:space-between;">
+            <div>
+              <strong id="welcomeLabel">Welcome</strong>
+              <div id="userHint" style="font-size:13px;color:#64748b">Your notes appear here</div>
+            </div>
+            <div>
+              <input id="searchInput" placeholder="Search headings..." oninput="renderList()" style="width:220px;padding:8px;border-radius:8px;">
+            </div>
+          </div>
+
+          <div class="notes-list" id="notesList"></div>
+        </div>
+
+        <div class="editor">
+          <label>Heading</label>
+          <input id="noteHeading" placeholder="Note heading">
+
+          <label>Content</label>
+          <textarea id="noteContent" placeholder="Write full note here..."></textarea>
+
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" onclick="saveNote()">Save Note</button>
+            <button class="btn secondary" onclick="clearEditor()">Clear</button>
+            <div style="flex:1"></div>
+            <div id="editLabel" style="font-size:13px;color:#64748b">New note</div>
+          </div>
+        </div>
+      </div>
+      <footer>Click a heading to edit it.</footer>
+    </div>
+  </div>
+
+  <div id="calculatorPanel" class="calc" style="display:none">
+    <input id="calcDisplay" class="calc-display" readonly />
+    <div class="calc-row">
+      <button class="btn small" onclick="calcPress('7')">7</button>
+      <button class="btn small" onclick="calcPress('8')">8</button>
+      <button class="btn small" onclick="calcPress('9')">9</button>
+      <button class="btn small" onclick="calcPress('/')">÷</button>
+
+      <button class="btn small" onclick="calcPress('4')">4</button>
+      <button class="btn small" onclick="calcPress('5')">5</button>
+      <button class="btn small" onclick="calcPress('6')">6</button>
+      <button class="btn small" onclick="calcPress('*')">×</button>
+
+      <button class="btn small" onclick="calcPress('1')">1</button>
+      <button class="btn small" onclick="calcPress('2')">2</button>
+      <button class="btn small" onclick="calcPress('3')">3</button>
+      <button class="btn small" onclick="calcPress('-')">−</button>
+
+      <button class="btn small" onclick="calcPress('0')">0</button>
+      <button class="btn small" onclick="calcPress('.')">.</button>
+      <button class="btn small" onclick="calcEval()">=</button>
+      <button class="btn small" onclick="calcPress('+')">+</button>
+
+      <button class="btn warn" style="grid-column: span 4" onclick="calcClear()">Clear</button>
+    </div>
+  </div>
+
+<script>
+/* ---------- storage helpers ---------- */
+const USERS_KEY = 'smart_notes_users_v1';
+const CUR_USER_KEY = 'smart_notes_current_user_v1';
+
+function readUsers(){
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY) || "{}");
+  } catch(e){
+    return {};
+  }
+}
+
+function saveUsers(map){
+  localStorage.setItem(USERS_KEY, JSON.stringify(map));
+}
+
+/* ---------- password hashing (SHA-256) ---------- */
+async function hashPass(p){
+  const data = new TextEncoder().encode('smart-notes:' + p);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function escapeHTML(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- Forgot Password ---------- */
+async function forgotPass(){
+  const u = document.getElementById('inUser').value.trim();
+  if(!u){
+    alert("Enter username first");
+    return;
+  }
+  const users = readUsers();
+  if(!users[u]){
+    alert("User not found!");
+    return;
+  }
+  const newPass = prompt("Enter new password for " + u);
+  if(!newPass){
+    alert("Password cannot be empty");
+    return;
+  }
+  users[u].password = await hashPass(newPass);
+  saveUsers(users);
+  alert("Password reset successfully. Please login again.");
+}
+
+/* ---------- theme ---------- */
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  localStorage.setItem('smart_notes_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+}
+
+/* ---------- auth & session ---------- */
+let currentUser = null;
+let editNoteId = null;
+
+async function doSignup(){
+  const u = document.getElementById('inUser').value.trim();
+  const p = document.getElementById('inPass').value;
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = '';
+  if(!u || !p){ msg.textContent = 'Enter username & password'; return; }
+  const users = readUsers();
+  if(users[u]){ msg.textContent = 'Username exists'; return; }
+  users[u] = { password: await hashPass(p), notes: [], nextId: 1 };
+  saveUsers(users);
+  currentUser = u;
+  localStorage.setItem(CUR_USER_KEY,currentUser);
+  enterMainUI();
+}
+
+async function doLogin(){
+  const u = document.getElementById('inUser').value.trim();
+  const p = document.getElementById('inPass').value;
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = '';
+  const users = readUsers();
+  const rec = users[u];
+  if(!rec){ msg.textContent = 'User not found'; return; }
+  const h = await hashPass(p);
+  if(rec.password !== h){
+    // accounts made with the older Base64 version: accept once, then upgrade to SHA-256
+    if(rec.password === btoa(unescape(encodeURIComponent(p)))){ rec.password = h; users[u] = rec; saveUsers(users); }
+    else { msg.textContent='Incorrect username or password'; return; }
+  }
+  currentUser = u;
+  localStorage.setItem(CUR_USER_KEY,currentUser);
+  enterMainUI();
+}
+
+function doLogout(){
+  currentUser=null;
+  editNoteId=null;
+  document.getElementById('mainUI').style.display='none';
+  document.getElementById('loginWrap').style.display='block';
+  document.getElementById('logoutTopBtn').style.display='none';
+  localStorage.removeItem(CUR_USER_KEY);
+}
+
+/* ---------- main UI ---------- */
+function enterMainUI(){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('mainUI').style.display='block';
+  document.getElementById('logoutTopBtn').style.display='inline-block';
+  document.getElementById('welcomeLabel').textContent="Hello, "+currentUser;
+  renderList();
+  clearEditor();
+}
+
+/* ---------- notes ---------- */
+function getUserRec(){ const users = readUsers(); return users[currentUser] || { notes: [], nextId:1 }; }
+function saveUserRec(rec){ const users = readUsers(); users[currentUser]=rec; saveUsers(users); }
+
+function saveNote(){
+  const head=document.getElementById('noteHeading').value.trim();
+  const txt=document.getElementById('noteContent').value.trim();
+  if(!head){ alert("Please enter heading"); return; }
+  const rec=getUserRec();
+  if(editNoteId!==null){
+    const idx=rec.notes.findIndex(n=>n.id===editNoteId);
+    if(idx>=0){ rec.notes[idx].heading=head; rec.notes[idx].text=txt; rec.notes[idx].updated=new Date().toISOString(); } 
+    else rec.notes.push({id:rec.nextId++, heading:head, text:txt, created:new Date().toISOString()});
+    editNoteId=null;
+  } else rec.notes.push({id:rec.nextId++, heading:head, text:txt, created:new Date().toISOString()});
+  saveUserRec(rec);
+  clearEditor();
+  renderList();
+}
+
+function clearEditor(){ document.getElementById('noteHeading').value=''; document.getElementById('noteContent').value=''; editNoteId=null; document.getElementById('editLabel').textContent='New note'; }
+
+function renderList(){
+  const listEl=document.getElementById('notesList');
+  listEl.innerHTML='';
+  if(!currentUser) return;
+  const rec=getUserRec();
+  const q=(document.getElementById('searchInput').value||'').trim().toLowerCase();
+  const notes=rec.notes.slice().reverse().filter(n=>!q || n.heading.toLowerCase().includes(q));
+  if(notes.length===0){ listEl.innerHTML='<div style="padding:12px;color:#64748b">'+(q?'No matching notes':'No notes yet')+'</div>'; return; }
+  notes.forEach(n=>{
+    const row=document.createElement('div');
+    row.className='note-row';
+    row.innerHTML=`<div style="flex:1"><div class="note-title">${escapeHTML(n.heading)}</div><div class="note-meta">${n.updated?('Updated: '+new Date(n.updated).toLocaleString()):('Created: '+new Date(n.created).toLocaleString())}</div></div><div class="note-actions"></div>`;
+    row.querySelector('.note-title').style.cursor='pointer';
+    row.querySelector('.note-title').onclick=()=>loadIntoEditor(n.id);
+    const actions=row.querySelector('.note-actions');
+    const viewBtn=document.createElement('button'); viewBtn.className='btn small'; viewBtn.textContent='View'; viewBtn.onclick=(ev)=>{ev.stopPropagation(); alert(n.heading+"\n\n"+n.text);}
+    const editBtn=document.createElement('button'); editBtn.className='btn small'; editBtn.textContent='Edit'; editBtn.onclick=(ev)=>{ev.stopPropagation(); loadIntoEditor(n.id);}
+    const delBtn=document.createElement('button'); delBtn.className='btn small warn'; delBtn.textContent='Delete'; delBtn.onclick=(ev)=>{ev.stopPropagation(); if(confirm('Delete?')){rec.notes=rec.notes.filter(x=>x.id!==n.id); saveUserRec(rec); if(editNoteId===n.id) clearEditor(); renderList();}}
+    actions.appendChild(viewBtn); actions.appendChild(editBtn); actions.appendChild(delBtn);
+    listEl.appendChild(row);
+  });
+}
+
+function loadIntoEditor(id){ const rec=getUserRec(); const note=rec.notes.find(x=>x.id===id); if(!note) return; document.getElementById('noteHeading').value=note.heading; document.getElementById('noteContent').value=note.text; editNoteId=id; document.getElementById('editLabel').textContent='Editing'; window.scrollTo({top:0,behavior:'smooth'}); }
+
+/* ---------- calculator ---------- */
+let calcBuffer='';
+function toggleCalculator(){ const el=document.getElementById('calculatorPanel'); el.style.display=(el.style.display==='none'?'block':'none'); }
+function calcPress(ch){ calcBuffer+=ch; document.getElementById('calcDisplay').value=calcBuffer; }
+function calcClear(){ calcBuffer=''; document.getElementById('calcDisplay').value=''; }
+function calcEval(){ try{ const safe=calcBuffer.replace(/×/g,'*').replace(/÷/g,'/'); const res=Function('"use strict";return('+safe+')')(); document.getElementById('calcDisplay').value=res; calcBuffer=res.toString(); }catch(e){ alert('Invalid'); calcClear();} }
+
+/* ---------- init ---------- */
+if(localStorage.getItem('smart_notes_theme')==='dark') document.body.classList.add('dark');
+document.getElementById('mainUI').style.display='none';
+document.getElementById('logoutTopBtn').style.display='none';
+(function detachCalc(){ const calc=document.getElementById('calculatorPanel'); if(calc){ calc.classList.add('floating'); document.body.appendChild(calc); calc.style.display='none';} })();
+(function restoreSession(){ const saved=localStorage.getItem(CUR_USER_KEY); if(saved){ const users=readUsers(); if(users[saved]){ currentUser=saved; enterMainUI(); } else localStorage.removeItem(CUR_USER_KEY); }})();
+</script>
+</body>
+</html>
